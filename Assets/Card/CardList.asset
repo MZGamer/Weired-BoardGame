@@ -14,5 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   actionCardsList:
   - {fileID: 11400000, guid: b499615dab8e76e40817b96f988b1dc7, type: 2}
-  corpCardsList: []
+  corpCardsList:
+  - {fileID: 11400000, guid: 9220cf5e6ee1687419de9dd0ee71920f, type: 2}
   fateCardsList: []
+  eventCardList: []
