@@ -29,7 +29,9 @@ public class Card {
     [Multiline(5)]
     public string description;
     public Sprite cardImg;
-    public int cardID;
+
+    [Header("1xx:機會 2xx:作物 3xx:命運 4xx:特效")]
+    public int ID;
 }
 
 [System.Serializable]

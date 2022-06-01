@@ -8,7 +8,8 @@ public enum ACTION {
     NEXT_PLAYER,
     CARD_ACTIVE,
     ASSIGN_PLAYER_ID,
-    GET_NEW_CARD
+    GET_NEW_CARD,
+    HARVEST
 }
 public class Package {
     public ACTION ACTION;

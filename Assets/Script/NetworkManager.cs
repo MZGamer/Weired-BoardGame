@@ -5,12 +5,15 @@ using System.Net.Sockets;
 using System.Net;
 using System;
 using System.Threading;
+using System.Text;
 
 public class NetworkManager : MonoBehaviour
 {
     static Socket clinetSocket;
     private static byte[] result = new byte[2048];
     public static Queue<Package> sendingQueue;
+
+    private delegate void DelTalkMessageUpdate(string s);
 
     bool connect = false;
 
@@ -52,7 +55,8 @@ public class NetworkManager : MonoBehaviour
                 connect = false;
                 throw new Exception(String.Format("You lost connection with server"));
             } else {
-
+                string json = Encoding.Unicode.GetString(result);
+                UI_Manager.animationQueue.Enqueue(JsonUtility.FromJson<Package>(json));
             }
 
         } catch (System.Net.Sockets.SocketException sockEx) {
@@ -62,6 +66,31 @@ public class NetworkManager : MonoBehaviour
     }
 
     void listenMessage() {
+        UdpClient udpClient = new UdpClient(1235);
+        try {
+            udpClient.Connect("25.9.176.234", 1235);
 
+            //IPEndPoint object will allow us to read datagrams sent from any source.
+            IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
+
+            // Blocks until a message returns on this socket from a remote host.
+            Byte[] receiveBytes = udpClient.Receive(ref RemoteIpEndPoint);
+            string returnData = Encoding.ASCII.GetString(receiveBytes);
+            MessageUpdate(returnData);
+
+            // Uses the IPEndPoint object to determine which of these two hosts responded.
+            Console.WriteLine("This is the message you received " +
+                                         returnData.ToString());
+            Console.WriteLine("This message was sent from " +
+                                        RemoteIpEndPoint.Address.ToString() +
+                                        " on their port number " +
+                                        RemoteIpEndPoint.Port.ToString());
+
+        } catch (Exception e) {
+            Debug.Log(e.ToString());
+        }
+    }
+    public void MessageUpdate(string message) {
+        UI_Manager.talkMessage += message;
     }
 }

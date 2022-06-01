@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 4851376053647589867}
   - component: {fileID: 4851376053647589866}
   m_Layer: 5
-  m_Name: ActionCardTemp
+  m_Name: CardTemp
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
