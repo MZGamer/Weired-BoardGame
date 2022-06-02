@@ -4,6 +4,7 @@ using UnityEngine;
 
 public enum ACTION {
     NULL,
+    GAMESTART,
     NEW_TURN,
     NEXT_PLAYER,
     CARD_ACTIVE,
@@ -12,12 +13,14 @@ public enum ACTION {
     HARVEST
 }
 public class Package {
+    public int src;
     public ACTION ACTION;
-    public List<PlayerStatus> playerStatuses;
     public int index;
     public int target;
+    public List<PlayerStatus> playerStatuses;
 
-    Package(ACTION ACTION = ACTION.NULL,int index =-1,int target = -1, List<PlayerStatus> playerStatuses = null) {
+    public Package(int src, ACTION ACTION = ACTION.NULL,int index =-1,int target = -1, List<PlayerStatus> playerStatuses = null) {
+        this.src = src;
         this.ACTION = ACTION;
         this.playerStatuses = playerStatuses;
         this.index = index;

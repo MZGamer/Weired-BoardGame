@@ -11,7 +11,7 @@ public class NetworkManager : MonoBehaviour
 {
     static Socket clinetSocket;
     private static byte[] result = new byte[2048];
-    public static Queue<Package> sendingQueue;
+    public static Queue<Package> sendingQueue = new Queue<Package>();
 
     private delegate void DelTalkMessageUpdate(string s);
 

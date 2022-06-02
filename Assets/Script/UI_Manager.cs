@@ -12,8 +12,7 @@ public class UI_Manager : MonoBehaviour
 
     [Header("遊玩資料")]
     public int turn;
-    public static Queue<Package> animationQueue;
-
+    public static Queue<Package> animationQueue = new Queue<Package>();
 
     [Header("玩家資料")]
     public List<PlayerStatus> players;
@@ -35,11 +34,18 @@ public class UI_Manager : MonoBehaviour
     [Header("Card_List")]
     public CardList cardList;
 
+    [Header("UI_Status")]
+    public bool selectingCardToUse;
+    public bool viewCardDis;
+    public bool selectingTarget;
+    public GameObject CardisAsking;
+
     [Header("Test")]
     public GameObject cardTemp;
     public TextMeshProUGUI message;
     public GameObject cardSelect;
     public static string talkMessage;
+    public int target = -1;
 
 
 
@@ -47,6 +53,7 @@ public class UI_Manager : MonoBehaviour
     void Start()
     {
         talkMessage = "";
+        animationQueue = new Queue<Package>();
         GUIInit();
         getNewActionCard(100);
     }
@@ -55,6 +62,8 @@ public class UI_Manager : MonoBehaviour
     void Update()
     {
         playerStatusDisplay();
+        closeSelecting();
+        GUIUpdate();
     }
     void GUIInit() {
         for(int i=0;i<4;i++) {
@@ -73,65 +82,105 @@ public class UI_Manager : MonoBehaviour
     }
 
     public void filedClick(int filedID) {
+        target = filedID;
         int corpCardID = players[playerID].farm[filedID].ID;
         if (corpCardID == 0) {
-            corpCardSelect();
+            List<Card> corpCardList = new List<Card>();
+            for(int i=0;i<cardList.corpCardsList.Count;i++) {
+                corpCardList.Add(cardList.corpCardsList[i].card);
+            }
+
+            generateCardSelectList(corpCardList);
         } else {
             showCardDescription(corpCardID);
         }
     }
-    void corpCardSelect() {
-        if (!cardSelect.active) {
-            GameObject newCard = Instantiate(cardTemp, Vector3.zero, Quaternion.identity, cardSelect.transform);
-
-            for (int i = 0; i < cardList.corpCardsList.Count; i++) {
-                corpCard corp = cardList.corpCardsList[i].card;
-
+    void generateCardSelectList(List<Card> card) {
+        if (!selectingCardToUse) {
+            selectingCardToUse = true;
+            for (int i = 0; i < card.Count; i++) {
+                GameObject newCard = Instantiate(cardTemp, Vector3.zero, Quaternion.identity, cardSelect.transform);
+                UI_Card CardInf = newCard.GetComponent<UI_Card>();
                 newCard.GetComponent<Button>().onClick.AddListener(delegate { showCardDescription(); });
 
-                newCard.name = corp.ID.ToString();
-                foreach (Transform component in newCard.transform) {
-                    switch (component.name) {
-                        case "CardName":
-                            component.GetComponent<TextMeshProUGUI>().text = corp.Name;
-                            break;
-                        case "CardImage":
-                            component.GetComponent<Image>().sprite = corp.cardImg;
-                            break;
-                        case "CardDescription":
-                            
-                            component.GetComponent<TextMeshProUGUI>().text = corpCardDesGenerater(corp.ID);
-                            break;
-                    }
+                newCard.name = card[i].ID.ToString();
+                CardInf.CardName.text = card[i].Name;
+                CardInf.CardImage.sprite = card[i].cardImg;
+                int cardID = card[i].ID;
+                CardInf.UserAction[0].GetComponent<Button>().onClick.AddListener(delegate { useCard(cardID); });
+                switch (card[i].ID / MAXCARD) {
+                    case 1:
+                        CardInf.CardDescription.text = card[i].description;
+                        break;
+                    case 2:
+                        CardInf.CardDescription.text = corpCardDesGenerater(card[i].ID);
+                        break;
                 }
+                
             }
             cardSelect.SetActive(true);
         }
     }
 
+    void closeSelecting() {
+        if(selectingCardToUse && Input.GetKeyDown(KeyCode.Mouse1) && CardisAsking == null) {
+            selectingCardToUse = false;
+            cardSelect.SetActive(false);
+            foreach(Transform child in cardSelect.transform) {
+                Destroy(child.gameObject);
+            }
+        }
+        if(CardisAsking != null && Input.GetKeyDown(KeyCode.Mouse1)) {
+            CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(false);
+            CardisAsking = null;
+        }
+    }
+
     void getNewActionCard(int cardID) {
         GameObject newCard = Instantiate(cardTemp,Vector3.zero,Quaternion.identity, handCardSlot.transform);
-
+        UI_Card CardInf = newCard.GetComponent<UI_Card>();
         newCard.GetComponent<Button>().onClick.AddListener(delegate { showCardDescription(); });
-        Card card = getCardType(cardID);
+        Card card = searchCard(cardID);
         if(card == null) {
             return;
         }
         newCard.name = cardID.ToString();
-        foreach (Transform component in newCard.transform) {
-            switch (component.name) {
-                case "CardName":
-                    component.GetComponent<TextMeshProUGUI>().text = card.Name;
-                    break;
-                case "CardImage":
-                    component.GetComponent<Image>().sprite = card.cardImg;
-                    break;
-                case "CardDescription":
-                    component.GetComponent<TextMeshProUGUI>().text = card.description;
-                    break;
-            }
-        }
+        CardInf.CardName.text = card.Name;
+        CardInf.CardImage.sprite = card.cardImg;
+        
+        CardInf.UserAction[0].GetComponent<Button>().onClick.AddListener(delegate { useCard(cardID); });
         players[playerID].handCard.Add(cardID);
+    }
+
+    public void useCard(int cardID) {
+        Debug.Log("OWO");
+        StartCoroutine(editPackage(cardID));
+    }
+
+    IEnumerator editPackage(int cardID) {
+        int cardTarget = -2;
+        switch (cardID / MAXCARD) {
+            case 1:
+                cardTarget = cardList.actionCardsList[cardID % MAXCARD].card.target;
+                if (cardTarget == -1) {
+                    selectingTarget = true;
+                    var b = StartCoroutine(selectTarget());
+                    yield return b;
+                    cardTarget = target;
+                }
+                break;
+            case 2:
+                cardTarget = target;
+                break;
+        }
+        Package send = new Package(playerID, ACTION.CARD_ACTIVE, cardID, cardTarget);
+        NetworkManager.sendingQueue.Enqueue(send);
+        Debug.Log(JsonUtility.ToJson(NetworkManager.sendingQueue.Dequeue()));
+
+    }
+
+    public IEnumerator selectTarget() {
+        yield return new WaitUntil(() => { return !selectingTarget; });
     }
 
     string corpCardDesGenerater(int cardID) {
@@ -150,11 +199,20 @@ public class UI_Manager : MonoBehaviour
         if (ID == 0) {
             var button = EventSystem.current.currentSelectedGameObject;
             cardID = int.Parse(button.name);
-            card = getCardType(cardID);
-        } else {
-            card = getCardType(ID);
-        }
+            card = searchCard(cardID);
+            if (CardisAsking != button.gameObject) {
 
+                if (CardisAsking != null) 
+                    CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(false);
+
+                CardisAsking = button.gameObject;
+                CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(true);
+
+            }
+            
+        } else {
+            card = searchCard(ID);
+        }
 
 
         cardName.text = card.Name;
@@ -169,7 +227,6 @@ public class UI_Manager : MonoBehaviour
         }
         
         double newHeight = 17.5 * cardDescription.GetTextInfo(cardDescription.text).lineCount;
-        Debug.Log(newHeight);
         cardDescriptionSize.sizeDelta = new Vector2( cardDescription.transform.localScale.x , (float)newHeight ) ;
     }
 
@@ -195,7 +252,7 @@ public class UI_Manager : MonoBehaviour
         }
     }
 
-    Card getCardType(int cardID) {
+    Card searchCard(int cardID) {
         int c = cardID / MAXCARD;
         switch (c) {
             case 1:
