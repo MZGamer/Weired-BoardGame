@@ -5,6 +5,7 @@ using UnityEngine;
 public enum ACTION {
     NULL,
     GAMESTART,
+    PLAYER_JOIN,
     NEW_TURN,
     NEXT_PLAYER,
     CARD_ACTIVE,
