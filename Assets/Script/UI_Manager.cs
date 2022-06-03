@@ -25,7 +25,11 @@ public class UI_Manager : MonoBehaviour
     public List<TextMeshProUGUI> playerMoney;
     public List<TextMeshProUGUI> playerHandCard;
 
+    [Header("Filed")]
+    public List<UI_Filed> Filed;
+
     [Header("Card_Description")]
+    public UI_Card cardWarnig;
     public TextMeshProUGUI cardName;
     public Image cardImage;
     public TextMeshProUGUI cardDescription;
@@ -38,7 +42,16 @@ public class UI_Manager : MonoBehaviour
     public bool selectingCardToUse;
     public bool viewCardDis;
     public bool selectingTarget;
+    public bool harvestAsking;
     public GameObject CardisAsking;
+    public GameObject PlayerSelectNotice;
+    public int viewPlayerID;
+    Coroutine CardStandbyFun;
+    Coroutine TargetSelectFun;
+
+    [Header("TopBar")]
+    public GameObject EventNoti;
+    public TextMeshProUGUI EventNotiText;
 
     [Header("Test")]
     public GameObject cardTemp;
@@ -53,16 +66,22 @@ public class UI_Manager : MonoBehaviour
     void Start()
     {
         talkMessage = "";
+        viewPlayerID = playerID;
         animationQueue = new Queue<Package>();
+        players[playerID].farm[0].grow();
+        FiledUpdate();
         GUIInit();
+        playerSlotUpdate();
         getNewActionCard(100);
+        getNewActionCard(101);
+
     }
 
     // Update is called once per frame
     void Update()
     {
-        playerStatusDisplay();
-        closeSelecting();
+        if(Input.GetKeyDown(KeyCode.Mouse1))
+            closeSelecting();
         GUIUpdate();
     }
     void GUIInit() {
@@ -70,38 +89,108 @@ public class UI_Manager : MonoBehaviour
             slot[i].SetActive(false);
         }
     }
-    void playerStatusDisplay() {
+    void playerSlotUpdate() {
+        for(int i=0;i< players.Count; i++) {
+            slot[i].SetActive(true);
+            playerName[i].text = players[i].name;
+            playerMoney[i].text = "$: " + players[i].money;
+            playerHandCard[i].text = "Card: " + players[i].handCard.Count;
+        }
+    }
+    public void FiledUpdate() {
         for(int i=0;i<4;i++) {
-            if(players.Count-1 >i) {
-                slot[i].SetActive(true);
-                playerName[i].text = players[i].name;
-                playerMoney[i].text = "$: " + players[i].money;
-                playerHandCard[i].text = "Card: " + players[i].handCard.Count;
+            if (players[viewPlayerID].farm[i].ID == 0) {
+                Filed[i].plantSprite.gameObject.SetActive(false);
+                Filed[i].turnCounter.gameObject.SetActive(false);
+                Filed[i].moneyIndecater.gameObject.SetActive(false);
+            } else {
+                corpCard corp = players[viewPlayerID].farm[i];
+                Filed[i].plantSprite.gameObject.SetActive(true);
+                Filed[i].turnCounter.gameObject.SetActive(true);
+                Filed[i].moneyIndecater.gameObject.SetActive(true);
+
+                Filed[i].plantSprite.sprite = corp.cardImg;
+                Filed[i].turnCounter.text = string.Format("Turn : {0}", corp.getTurn());
+                Filed[i].moneyIndecater.text = string.Format("$ : {0}", corp.getReward());
             }
         }
     }
 
     public void filedClick(int filedID) {
         target = filedID;
-        int corpCardID = players[playerID].farm[filedID].ID;
+        int corpCardID = players[viewPlayerID].farm[filedID].ID;
+        closeSelecting();
+        if(selectingCardToUse) {
+            closeSelecting();
+        }
         if (corpCardID == 0) {
-            List<Card> corpCardList = new List<Card>();
-            for(int i=0;i<cardList.corpCardsList.Count;i++) {
-                corpCardList.Add(cardList.corpCardsList[i].card);
+            if(playerID == viewPlayerID) {
+                List<Card> corpCardList = new List<Card>();
+            
+                for (int i=0;i<cardList.corpCardsList.Count;i++) {
+                    corpCardList.Add(cardList.corpCardsList[i].card);
+                }
+
+                generateCardSelectList(corpCardList);
             }
 
-            generateCardSelectList(corpCardList);
         } else {
+            if (playerID == viewPlayerID && players[playerID].farm[filedID].getTurn() > 0) {
+                //closeSelecting();
+                Filed[filedID].HarvestButton.SetActive(true);
+
+                harvestAsking = true;
+            }
+            CardisAsking = EventSystem.current.currentSelectedGameObject;
             showCardDescription(corpCardID);
         }
     }
+
+    public void cardClick() {
+        var button = EventSystem.current.currentSelectedGameObject;
+        int cardID = int.Parse(button.name);
+        if (CardisAsking != button.gameObject) {
+            if(!(CardisAsking == null && selectingCardToUse))
+                closeSelecting();
+
+            if (cardID < 300) {
+                CardisAsking = button.gameObject;
+                if(CardisAsking.GetComponent<UI_Card>().UserAction.Count > 0)
+                    CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(true);
+            }
+            showCardDescription(cardID);
+
+
+        }
+    }
+
+    public void playerSlotClick(int slotID) {
+        if(selectingTarget) {
+            target = slotID;
+            selectingTarget = false;
+        } else {
+            viewPlayerID = slotID;
+            closeSelecting();
+            if (selectingCardToUse) {
+                closeSelecting();
+            }
+            FiledUpdate();
+        }
+    }
+
+    public void eventCheckClick() {
+        var button = EventSystem.current.currentSelectedGameObject;
+        int cardID = int.Parse(button.name);
+        showCardDescription(cardID);
+    }
+
     void generateCardSelectList(List<Card> card) {
         if (!selectingCardToUse) {
             selectingCardToUse = true;
             for (int i = 0; i < card.Count; i++) {
                 GameObject newCard = Instantiate(cardTemp, Vector3.zero, Quaternion.identity, cardSelect.transform);
                 UI_Card CardInf = newCard.GetComponent<UI_Card>();
-                newCard.GetComponent<Button>().onClick.AddListener(delegate { showCardDescription(); });
+                newCard.GetComponent<Button>().onClick.AddListener(delegate { cardClick(); });
 
                 newCard.name = card[i].ID.ToString();
                 CardInf.CardName.text = card[i].Name;
@@ -123,110 +212,117 @@ public class UI_Manager : MonoBehaviour
     }
 
     void closeSelecting() {
-        if(selectingCardToUse && Input.GetKeyDown(KeyCode.Mouse1) && CardisAsking == null) {
+        if(CardisAsking)
+            Debug.Log(CardisAsking.name);
+        if(selectingCardToUse && CardisAsking == null) {
             selectingCardToUse = false;
             cardSelect.SetActive(false);
             foreach(Transform child in cardSelect.transform) {
                 Destroy(child.gameObject);
             }
         }
-        if(CardisAsking != null && Input.GetKeyDown(KeyCode.Mouse1)) {
-            CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(false);
+        if(CardisAsking != null) {
+            if (TargetSelectFun != null) {
+                if(CardStandbyFun != null)
+                    StopCoroutine(CardStandbyFun);
+                StopCoroutine(TargetSelectFun);
+                PlayerSelectNotice.SetActive(false);
+                TargetSelectFun = null;
+                CardStandbyFun = null;
+            }
+            selectingTarget = false;
+            if(harvestAsking) {
+                CardisAsking.GetComponent<UI_Filed>().HarvestButton.SetActive(false);
+                harvestAsking = false;
+            } else {
+                CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(false);
+            }
+            
             CardisAsking = null;
         }
     }
 
-    void getNewActionCard(int cardID) {
-        GameObject newCard = Instantiate(cardTemp,Vector3.zero,Quaternion.identity, handCardSlot.transform);
-        UI_Card CardInf = newCard.GetComponent<UI_Card>();
-        newCard.GetComponent<Button>().onClick.AddListener(delegate { showCardDescription(); });
-        Card card = searchCard(cardID);
-        if(card == null) {
-            return;
-        }
-        newCard.name = cardID.ToString();
-        CardInf.CardName.text = card.Name;
-        CardInf.CardImage.sprite = card.cardImg;
-        
-        CardInf.UserAction[0].GetComponent<Button>().onClick.AddListener(delegate { useCard(cardID); });
-        players[playerID].handCard.Add(cardID);
-    }
 
     public void useCard(int cardID) {
-        Debug.Log("OWO");
-        StartCoroutine(editPackage(cardID));
+        CardStandbyFun = StartCoroutine(editPackage(ACTION.CARD_ACTIVE, cardID));
+        EventSystem.current.currentSelectedGameObject.SetActive(false);
+
     }
 
-    IEnumerator editPackage(int cardID) {
-        int cardTarget = -2;
-        switch (cardID / MAXCARD) {
-            case 1:
-                cardTarget = cardList.actionCardsList[cardID % MAXCARD].card.target;
-                if (cardTarget == -1) {
-                    selectingTarget = true;
-                    var b = StartCoroutine(selectTarget());
-                    yield return b;
-                    cardTarget = target;
+    public void harvestClick(int filedID) {
+        CardStandbyFun = StartCoroutine(editPackage(ACTION.HARVEST, filedID));
+        EventSystem.current.currentSelectedGameObject.SetActive(false);
+        harvestAsking = false;
+    }
+
+    IEnumerator editPackage(ACTION action, int index = -1) {
+        int target = -2;
+        switch (action) {
+            case ACTION.CARD_ACTIVE:
+                int cardID = index;
+                switch (cardID / MAXCARD) {
+                    case 1:
+                        target = cardList.actionCardsList[cardID % MAXCARD].card.target;
+                        if (target == -1) {
+                            selectingTarget = true;
+                            PlayerSelectNotice.SetActive(true);
+                            TargetSelectFun = StartCoroutine(selectTarget());
+                            yield return TargetSelectFun;
+                            PlayerSelectNotice.SetActive(false);
+                            target = this.target;
+                        }
+                        break;
+                    case 2:
+                        target = this.target;
+                        break;
                 }
                 break;
-            case 2:
-                cardTarget = target;
-                break;
+
+            case ACTION.HARVEST:
+                target = index;
+                index = players[playerID].farm[target].ID;
+                 break;
         }
-        Package send = new Package(playerID, ACTION.CARD_ACTIVE, cardID, cardTarget);
+
+        Package send = new Package(playerID, action, index, target);
         NetworkManager.sendingQueue.Enqueue(send);
+        CardisAsking = null;
+        closeSelecting();
         Debug.Log(JsonUtility.ToJson(NetworkManager.sendingQueue.Dequeue()));
 
     }
 
-    public IEnumerator selectTarget() {
+    IEnumerator selectTarget() {
         yield return new WaitUntil(() => { return !selectingTarget; });
     }
 
     string corpCardDesGenerater(int cardID) {
         corpCard corp = cardList.corpCardsList[cardID % MAXCARD].card;
         string result = corp.description;
-        result += string.Format( "\n\n [收成情報(生長回合數/收成)]" +
+        result += string.Format( "\n\n [收成情報(回合數/收成)]" +
                                  "\nTurn 1 : {0}" +
                                  "\nTurn 2 : {1}" +
                                  "\nTurn 3 : {2}" +
                                  "\nTurn 4 : {3}", corp.reward[0], corp.reward[1], corp.reward[2], corp.reward[3]);
         return result;
     }
-    public void showCardDescription(int ID = 0) {
-        Card card;
-        int cardID = ID;
-        if (ID == 0) {
-            var button = EventSystem.current.currentSelectedGameObject;
-            cardID = int.Parse(button.name);
-            card = searchCard(cardID);
-            if (CardisAsking != button.gameObject) {
-
-                if (CardisAsking != null) 
-                    CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(false);
-
-                CardisAsking = button.gameObject;
-                CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(true);
-
-            }
-            
-        } else {
-            card = searchCard(ID);
-        }
+    public void showCardDescription(int cardID) {
+        Card card =  searchCard(cardID);
 
 
         cardName.text = card.Name;
         cardImage.sprite = card.cardImg;
         switch (cardID / MAXCARD) {
-            case 1:
-                cardDescription.text = card.description;
-                break;
             case 2:
                 cardDescription.text = corpCardDesGenerater(cardID);
                 break;
+            default:
+                cardDescription.text = card.description;
+                break;
+
         }
         
-        double newHeight = 17.5 * cardDescription.GetTextInfo(cardDescription.text).lineCount;
+        double newHeight = 21.5 * cardDescription.GetTextInfo(cardDescription.text).lineCount;
         cardDescriptionSize.sizeDelta = new Vector2( cardDescription.transform.localScale.x , (float)newHeight ) ;
     }
 
@@ -239,6 +335,23 @@ public class UI_Manager : MonoBehaviour
                 case ACTION.NEXT_PLAYER:
                     break;
                 case ACTION.CARD_ACTIVE:
+                    switch(act.index/MAXCARD) {
+                        case 1:
+                            actionCardAnimate(act.index);
+                            playerSlotUpdate();
+                            break;
+                        case 2:
+                            playerSlotUpdate();
+                            FiledUpdate();
+                            break;
+                        case 3:
+                            FateCardAni(act.index);
+                            playerSlotUpdate();
+                            break;
+                        case 4:
+                            eventCardAnimate(act.index);
+                            break;
+                    }
                     break;
                 case ACTION.ASSIGN_PLAYER_ID:
                     playerID = act.index;
@@ -247,9 +360,33 @@ public class UI_Manager : MonoBehaviour
                     getNewActionCard(act.index);
                     break;
                 case ACTION.HARVEST:
+                    FiledUpdate();
+                    playerSlotUpdate();
                     break;
             }
         }
+    }
+    void actionCardAnimate(int cardID) {
+        cardWarningUI(cardID);
+    }
+
+    void cardWarningUI(int cardID) {
+        Card card = searchCard(cardID);
+        cardWarnig.CardName.text = card.Name;
+        cardWarnig.CardImage.sprite = card.cardImg;
+        cardWarnig.CardDescription.text = card.description;
+
+        cardWarnig.gameObject.name = cardID.ToString();
+        cardWarnig.gameObject.SetActive(true);
+    }
+
+    void FateCardAni(int cardID) {
+        cardWarningUI(cardID);
+    }
+
+    void eventCardAnimate(int cardID) {
+        EventNoti.name = cardID.ToString();
+        EventNotiText.text = string.Format("Event:{0}", cardList.eventCardList[cardID % MAXCARD].card.Name);
     }
 
     Card searchCard(int cardID) {
@@ -265,6 +402,22 @@ public class UI_Manager : MonoBehaviour
                 return cardList.eventCardList[cardID % MAXCARD].card;
         }
         return null;
+    }
+
+    void getNewActionCard(int cardID) {
+        GameObject newCard = Instantiate(cardTemp, Vector3.zero, Quaternion.identity, handCardSlot.transform);
+        UI_Card CardInf = newCard.GetComponent<UI_Card>();
+        newCard.GetComponent<Button>().onClick.AddListener(delegate { cardClick(); });
+        Card card = searchCard(cardID);
+        if (card == null) {
+            return;
+        }
+        newCard.name = cardID.ToString();
+        CardInf.CardName.text = card.Name;
+        CardInf.CardImage.sprite = card.cardImg;
+
+        CardInf.UserAction[0].GetComponent<Button>().onClick.AddListener(delegate { useCard(cardID); });
+        players[playerID].handCard.Add(cardID);
     }
 
 }

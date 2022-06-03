@@ -61,12 +61,13 @@
     <Compile Include="Assets\Class\PlayerStatus.cs" />
     <Compile Include="Assets\Script\UI_Manager.cs" />
     <Compile Include="Assets\Scriptable object\Event_Card_Temp.cs" />
+    <Compile Include="Assets\Struct\UI_Card.cs" />
     <Compile Include="Assets\Scriptable object\Fate_Card_Temp.cs" />
     <Compile Include="Assets\Scriptable object\Action_Card_Temp.cs" />
     <Compile Include="Assets\Class\Packge.cs" />
     <Compile Include="Assets\Class\CardList.cs" />
     <Compile Include="Assets\Class\Card.cs" />
-    <Compile Include="Assets\Struct\UI_Card.cs" />
+    <Compile Include="Assets\Struct\UI_Filed.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />

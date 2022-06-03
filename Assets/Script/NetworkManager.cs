@@ -26,6 +26,7 @@ public class NetworkManager : MonoBehaviour
     // Update is called once per frame
     void Update() {
         listenSocket();
+        packageSend();
     }
 
     void StartConnect() {
@@ -63,6 +64,25 @@ public class NetworkManager : MonoBehaviour
             Debug.Log(sockEx);
             connect = false;
         }
+    }
+
+    void packageSend() {
+        if (!connect)
+            return;
+
+        while(sendingQueue.Count != 0) {
+            try {
+                Package pkg = sendingQueue.Dequeue();
+                string json = JsonUtility.ToJson(pkg);
+
+                clinetSocket.Send(Encoding.Unicode.GetBytes(json));
+            } catch (System.Net.Sockets.SocketException sockEx) {
+                Debug.Log(sockEx);
+                connect = false;
+            }
+
+        }
+
     }
 
     void listenMessage() {

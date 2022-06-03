@@ -53,6 +53,9 @@ public class corpCard : Card {
         }
         return false;
     }
+    public int getTurn() {
+        return turn;
+    }
 }
 
 [System.Serializable]
