@@ -61,6 +61,7 @@ public class corpCard : Card {
 [System.Serializable]
 public class actionCard : Card {
     public int turn;
+    public int cardCount;
     [Header("-2 : 自己, -1 : 需指定 , 5 : 全場")]
     public int target;
     public cardAction Action;
@@ -77,12 +78,14 @@ public class actionCard : Card {
 [System.Serializable]
 public class FateCard : Card {
     public cardAction Action;
-    List<roll> rools;
+    public int cardCount;
+    public List<roll> rools;
 }
+
 
 
 [System.Serializable]
-public class  EventCard: Card {
+public class EventCard : Card {
     public EFFECT_ID effect;
+    public int cardCount;
 }
-

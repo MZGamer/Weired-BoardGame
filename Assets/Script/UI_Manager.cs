@@ -61,19 +61,22 @@ public class UI_Manager : MonoBehaviour
     public int target = -1;
 
 
+    void TestCase() {
+        //players[playerID].farm[0].grow();
+        FiledUpdate();
+        GUIInit();
+        playerSlotUpdate();
+        getNewActionCard(100);
+        getNewActionCard(101);
+    }
+
 
     // Start is called before the first frame update
     void Start()
     {
         talkMessage = "";
         viewPlayerID = playerID;
-        animationQueue = new Queue<Package>();
-        players[playerID].farm[0].grow();
-        FiledUpdate();
-        GUIInit();
-        playerSlotUpdate();
-        getNewActionCard(100);
-        getNewActionCard(101);
+        animationQueue.Clear();
 
     }
 
@@ -105,13 +108,15 @@ public class UI_Manager : MonoBehaviour
                 Filed[i].moneyIndecater.gameObject.SetActive(false);
             } else {
                 corpCard corp = players[viewPlayerID].farm[i];
+                Sprite corpImg = cardList.corpCardsList[players[viewPlayerID].farm[i].ID % MAXCARD].card.cardImg;
+
+                Filed[i].plantSprite.sprite = corpImg;
+                Filed[i].turnCounter.text = string.Format("Turn : {0}", corp.getTurn());
+                Filed[i].moneyIndecater.text = string.Format("$ : {0}", corp.getReward());
+
                 Filed[i].plantSprite.gameObject.SetActive(true);
                 Filed[i].turnCounter.gameObject.SetActive(true);
                 Filed[i].moneyIndecater.gameObject.SetActive(true);
-
-                Filed[i].plantSprite.sprite = corp.cardImg;
-                Filed[i].turnCounter.text = string.Format("Turn : {0}", corp.getTurn());
-                Filed[i].moneyIndecater.text = string.Format("$ : {0}", corp.getReward());
             }
         }
     }
@@ -138,10 +143,10 @@ public class UI_Manager : MonoBehaviour
             if (playerID == viewPlayerID && players[playerID].farm[filedID].getTurn() > 0) {
                 //closeSelecting();
                 Filed[filedID].HarvestButton.SetActive(true);
-
+                CardisAsking = EventSystem.current.currentSelectedGameObject;
                 harvestAsking = true;
             }
-            CardisAsking = EventSystem.current.currentSelectedGameObject;
+            
             showCardDescription(corpCardID);
         }
     }
@@ -288,7 +293,8 @@ public class UI_Manager : MonoBehaviour
         NetworkManager.sendingQueue.Enqueue(send);
         CardisAsking = null;
         closeSelecting();
-        Debug.Log(JsonUtility.ToJson(NetworkManager.sendingQueue.Dequeue()));
+        //Debug.Log(JsonUtility.ToJson(NetworkManager.sendingQueue.Dequeue()));
+        Debug.Log(string.Format("Sending : {0}",JsonUtility.ToJson(send)));
 
     }
 
@@ -330,6 +336,11 @@ public class UI_Manager : MonoBehaviour
         while (animationQueue.Count != 0) {
             Package act = animationQueue.Dequeue();
             switch (act.ACTION){
+                case ACTION.PLAYER_JOIN:
+                    players = new List<PlayerStatus>(act.playerStatuses);
+                    TestCase();
+                    playerSlotUpdate();
+                    break;
                 case ACTION.NEW_TURN:
                     break;
                 case ACTION.NEXT_PLAYER:
@@ -341,6 +352,7 @@ public class UI_Manager : MonoBehaviour
                             playerSlotUpdate();
                             break;
                         case 2:
+                            players = act.playerStatuses;
                             playerSlotUpdate();
                             FiledUpdate();
                             break;
@@ -355,6 +367,13 @@ public class UI_Manager : MonoBehaviour
                     break;
                 case ACTION.ASSIGN_PLAYER_ID:
                     playerID = act.index;
+                    PlayerStatus player = new PlayerStatus();
+                    player.name = string.Format("Test Player {0}",playerID);
+
+                    List<PlayerStatus> sendName = new List<PlayerStatus>();
+                    sendName.Add(player);
+                    Package pkg = new Package(playerID, ACTION.PLAYER_JOIN, 0, 0, sendName);
+                    NetworkManager.sendingQueue.Enqueue(pkg);
                     break;
                 case ACTION.GET_NEW_CARD:
                     getNewActionCard(act.index);

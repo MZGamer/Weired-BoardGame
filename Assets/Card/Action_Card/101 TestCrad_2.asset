@@ -18,6 +18,7 @@ MonoBehaviour:
     cardImg: {fileID: 21300000, guid: a3a276e3607353b408291f8e145fcc29, type: 3}
     ID: 101
     turn: 0
+    cardCount: 2
     target: -1
     Action: 0
     effect: 0

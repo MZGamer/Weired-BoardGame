@@ -16,8 +16,9 @@ MonoBehaviour:
     Name: "\u6E2C\u8A66"
     description: "\u5C31\u53EA\u662F\u500B\u6E2C\u8A66\n\u6C92\u4E86"
     cardImg: {fileID: 21300000, guid: a3a276e3607353b408291f8e145fcc29, type: 3}
-    ID: 0
+    ID: 100
     turn: 0
+    cardCount: 2
     target: -2
     Action: 1
     effect: 0

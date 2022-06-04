@@ -18,3 +18,4 @@ MonoBehaviour:
     cardImg: {fileID: 21300000, guid: a3a276e3607353b408291f8e145fcc29, type: 3}
     ID: 400
     effect: 0
+    cardCount: 2

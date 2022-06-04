@@ -10,6 +10,7 @@ using System.Text;
 public class NetworkManager : MonoBehaviour
 {
     static Socket clinetSocket;
+    List<Socket> gateway = new List<Socket>();
     private static byte[] result = new byte[2048];
     public static Queue<Package> sendingQueue = new Queue<Package>();
 
@@ -20,12 +21,14 @@ public class NetworkManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        Application.runInBackground = true;
         StartConnect();
     }
 
     // Update is called once per frame
     void Update() {
-        listenSocket();
+        
+        //listenSocket();
         packageSend();
     }
 
@@ -35,9 +38,11 @@ public class NetworkManager : MonoBehaviour
         clinetSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         try {
             clinetSocket.Connect(ipe);
-            clinetSocket.Blocking = false;
+            //clinetSocket.Blocking = false;
             connect = true;
             Thread listening = new Thread(listenMessage);
+            
+            StartCoroutine(listenSocket());
         } catch (System.Net.Sockets.SocketException sockEx) {
             Debug.Log(sockEx);
             connect = false;
@@ -46,24 +51,40 @@ public class NetworkManager : MonoBehaviour
 
     }
 
-    void listenSocket() {
-        if (!connect)
-            return;
-        try {
-            //通過clientSocket接收資料
-            int receiveNumber = clinetSocket.Receive(result);
-            if (receiveNumber == 0) {
-                connect = false;
-                throw new Exception(String.Format("You lost connection with server"));
-            } else {
-                string json = Encoding.Unicode.GetString(result);
-                UI_Manager.animationQueue.Enqueue(JsonUtility.FromJson<Package>(json));
-            }
+    void disconnect() {
+        clinetSocket.Close();
+        connect = false;
+    }
 
-        } catch (System.Net.Sockets.SocketException sockEx) {
-            Debug.Log(sockEx);
-            connect = false;
+    IEnumerator listenSocket() {
+        while (true) {
+            if (!connect)
+                break;
+            gateway.Add(clinetSocket);
+            Socket.Select(gateway,null,null,100);
+            Debug.Log(gateway.Count);
+            try {
+                if (gateway.Count != 0) {
+                    //通過clientSocket接收資料
+                    int receiveNumber = clinetSocket.Receive(result);
+                    if (receiveNumber < 0) {
+                        connect = false;
+                        throw new Exception(String.Format("You lost connection with server"));
+                    } else {
+                        string json = Encoding.Unicode.GetString(result);
+                        UI_Manager.animationQueue.Enqueue(JsonUtility.FromJson<Package>(json));
+                        Array.Clear(result, 0, result.Length);
+                    }                    
+
+                }
+
+            } catch (System.Net.Sockets.SocketException sockEx) {
+                Debug.Log(sockEx);
+                disconnect();
+            }
+            yield return new WaitForSeconds(0.1f);
         }
+        yield return null;
     }
 
     void packageSend() {
@@ -74,11 +95,10 @@ public class NetworkManager : MonoBehaviour
             try {
                 Package pkg = sendingQueue.Dequeue();
                 string json = JsonUtility.ToJson(pkg);
-
                 clinetSocket.Send(Encoding.Unicode.GetBytes(json));
             } catch (System.Net.Sockets.SocketException sockEx) {
                 Debug.Log(sockEx);
-                connect = false;
+                disconnect();
             }
 
         }
