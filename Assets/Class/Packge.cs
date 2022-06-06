@@ -11,7 +11,8 @@ public enum ACTION {
     CARD_ACTIVE,
     ASSIGN_PLAYER_ID,
     GET_NEW_CARD,
-    HARVEST
+    HARVEST,
+    PLAYER_DISCONNECTED
 }
 public class Package {
     public int src;

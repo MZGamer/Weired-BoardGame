@@ -10,6 +10,15 @@ public class UI_Manager : MonoBehaviour
 {
     const int MAXCARD = 100;
 
+    [Header("Hobby")]
+    public GameObject hobby;
+    public List<GameObject> hobbyPlayerNameDisplay;
+    public List<TextMeshProUGUI> hobbyPlayerNameText;
+    public TextMeshProUGUI IPInput;
+    public TextMeshProUGUI PortInput;
+    public TextMeshProUGUI PlayerNameInput;
+    public GameObject gameStartButton;
+
     [Header("¹Cª±¸ê®Æ")]
     public int turn;
     public static Queue<Package> animationQueue = new Queue<Package>();
@@ -25,11 +34,15 @@ public class UI_Manager : MonoBehaviour
     public List<TextMeshProUGUI> playerMoney;
     public List<TextMeshProUGUI> playerHandCard;
 
+    [Header("NextPlayer Button")]
+    public GameObject nextPlayerButon;
+
     [Header("Filed")]
     public List<UI_Filed> Filed;
 
     [Header("Card_Description")]
     public UI_Card cardWarnig;
+    public Animator cardWarnigControl;
     public TextMeshProUGUI cardName;
     public Image cardImage;
     public TextMeshProUGUI cardDescription;
@@ -46,7 +59,8 @@ public class UI_Manager : MonoBehaviour
     public GameObject CardisAsking;
     public GameObject PlayerSelectNotice;
     public int viewPlayerID;
-    Coroutine CardStandbyFun;
+    public int buttonState = 0;
+    Coroutine networkStandbyFun;
     Coroutine TargetSelectFun;
 
     [Header("TopBar")]
@@ -68,8 +82,19 @@ public class UI_Manager : MonoBehaviour
         playerSlotUpdate();
         getNewActionCard(100);
         getNewActionCard(101);
+        cardWarningUI(100);
     }
 
+
+    public void ConnectButtonClick() {
+        NetworkManager.ip = IPInput.text.Substring(0, IPInput.text.Length - 1);
+        string port = PortInput.text;
+
+        port = port.Substring(0, port.Length - 1);
+        int.TryParse(port, out NetworkManager.port);
+        NetworkManager.connectSettingComplete = true;
+
+    }
 
     // Start is called before the first frame update
     void Start()
@@ -77,6 +102,7 @@ public class UI_Manager : MonoBehaviour
         talkMessage = "";
         viewPlayerID = playerID;
         animationQueue.Clear();
+        TestCase();
 
     }
 
@@ -85,8 +111,9 @@ public class UI_Manager : MonoBehaviour
     {
         if(Input.GetKeyDown(KeyCode.Mouse1))
             closeSelecting();
-        GUIUpdate();
+        packageFilter();
     }
+    //GUI Update Function
     void GUIInit() {
         for(int i=0;i<4;i++) {
             slot[i].SetActive(false);
@@ -121,15 +148,16 @@ public class UI_Manager : MonoBehaviour
         }
     }
 
+    //First Step Button Click Event
     public void filedClick(int filedID) {
         target = filedID;
         int corpCardID = players[viewPlayerID].farm[filedID].ID;
         closeSelecting();
-        if(selectingCardToUse) {
+        if(buttonState>0) {
             closeSelecting();
         }
         if (corpCardID == 0) {
-            if(playerID == viewPlayerID) {
+            if(playerID == viewPlayerID && playerID == turn % players.Count) {
                 List<Card> corpCardList = new List<Card>();
             
                 for (int i=0;i<cardList.corpCardsList.Count;i++) {
@@ -140,11 +168,12 @@ public class UI_Manager : MonoBehaviour
             }
 
         } else {
-            if (playerID == viewPlayerID && players[playerID].farm[filedID].getTurn() > 0) {
+            if (playerID == viewPlayerID && players[playerID].farm[filedID].getTurn() > 0 && playerID == turn % players.Count) {
                 //closeSelecting();
                 Filed[filedID].HarvestButton.SetActive(true);
                 CardisAsking = EventSystem.current.currentSelectedGameObject;
                 harvestAsking = true;
+                buttonState = 1;
             }
             
             showCardDescription(corpCardID);
@@ -155,10 +184,11 @@ public class UI_Manager : MonoBehaviour
         var button = EventSystem.current.currentSelectedGameObject;
         int cardID = int.Parse(button.name);
         if (CardisAsking != button.gameObject) {
-            if(!(CardisAsking == null && selectingCardToUse))
+            if(!(buttonState == 0 && selectingCardToUse))
                 closeSelecting();
 
-            if (cardID < 300) {
+            if (cardID < 300 && playerID == turn % players.Count) {
+                buttonState = 1;
                 CardisAsking = button.gameObject;
                 if(CardisAsking.GetComponent<UI_Card>().UserAction.Count > 0)
                     CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(true);
@@ -189,9 +219,17 @@ public class UI_Manager : MonoBehaviour
         showCardDescription(cardID);
     }
 
+    public void nextPlayerButtonClick() {
+        var button = EventSystem.current.currentSelectedGameObject;
+        button.gameObject.SetActive(false);
+        StartCoroutine(editPackage(ACTION.NEXT_PLAYER));
+    }
+
+    //Card Selecting
     void generateCardSelectList(List<Card> card) {
         if (!selectingCardToUse) {
             selectingCardToUse = true;
+            buttonState = 0;
             for (int i = 0; i < card.Count; i++) {
                 GameObject newCard = Instantiate(cardTemp, Vector3.zero, Quaternion.identity, cardSelect.transform);
                 UI_Card CardInf = newCard.GetComponent<UI_Card>();
@@ -217,23 +255,21 @@ public class UI_Manager : MonoBehaviour
     }
 
     void closeSelecting() {
-        if(CardisAsking)
-            Debug.Log(CardisAsking.name);
-        if(selectingCardToUse && CardisAsking == null) {
+        if (selectingCardToUse && buttonState == 0) {
             selectingCardToUse = false;
             cardSelect.SetActive(false);
             foreach(Transform child in cardSelect.transform) {
                 Destroy(child.gameObject);
             }
         }
-        if(CardisAsking != null) {
+        if(buttonState > 0) {
             if (TargetSelectFun != null) {
-                if(CardStandbyFun != null)
-                    StopCoroutine(CardStandbyFun);
+                if(networkStandbyFun != null)
+                    StopCoroutine(networkStandbyFun);
                 StopCoroutine(TargetSelectFun);
                 PlayerSelectNotice.SetActive(false);
                 TargetSelectFun = null;
-                CardStandbyFun = null;
+                networkStandbyFun = null;
             }
             selectingTarget = false;
             if(harvestAsking) {
@@ -242,26 +278,26 @@ public class UI_Manager : MonoBehaviour
             } else {
                 CardisAsking.GetComponent<UI_Card>().UserAction[0].SetActive(false);
             }
-            
+            buttonState = 0;
             CardisAsking = null;
         }
     }
 
-
+    //2 Stage Button Click Event
     public void useCard(int cardID) {
-        CardStandbyFun = StartCoroutine(editPackage(ACTION.CARD_ACTIVE, cardID));
+        networkStandbyFun = StartCoroutine(editPackage(ACTION.CARD_ACTIVE, cardID));
         EventSystem.current.currentSelectedGameObject.SetActive(false);
 
     }
 
     public void harvestClick(int filedID) {
-        CardStandbyFun = StartCoroutine(editPackage(ACTION.HARVEST, filedID));
+        networkStandbyFun = StartCoroutine(editPackage(ACTION.HARVEST, filedID));
         EventSystem.current.currentSelectedGameObject.SetActive(false);
         harvestAsking = false;
     }
 
     IEnumerator editPackage(ACTION action, int index = -1) {
-        int target = -2;
+        int target = 0;
         switch (action) {
             case ACTION.CARD_ACTIVE:
                 int cardID = index;
@@ -269,12 +305,14 @@ public class UI_Manager : MonoBehaviour
                     case 1:
                         target = cardList.actionCardsList[cardID % MAXCARD].card.target;
                         if (target == -1) {
+                            buttonState = 2;
                             selectingTarget = true;
                             PlayerSelectNotice.SetActive(true);
                             TargetSelectFun = StartCoroutine(selectTarget());
                             yield return TargetSelectFun;
                             PlayerSelectNotice.SetActive(false);
                             target = this.target;
+                            buttonState = 1;
                         }
                         break;
                     case 2:
@@ -287,14 +325,17 @@ public class UI_Manager : MonoBehaviour
                 target = index;
                 index = players[playerID].farm[target].ID;
                  break;
+                
         }
 
         Package send = new Package(playerID, action, index, target);
         NetworkManager.sendingQueue.Enqueue(send);
         CardisAsking = null;
+        buttonState = 0;
         closeSelecting();
         //Debug.Log(JsonUtility.ToJson(NetworkManager.sendingQueue.Dequeue()));
         Debug.Log(string.Format("Sending : {0}",JsonUtility.ToJson(send)));
+        networkStandbyFun = null;
 
     }
 
@@ -302,6 +343,7 @@ public class UI_Manager : MonoBehaviour
         yield return new WaitUntil(() => { return !selectingTarget; });
     }
 
+    //Card Description
     string corpCardDesGenerater(int cardID) {
         corpCard corp = cardList.corpCardsList[cardID % MAXCARD].card;
         string result = corp.description;
@@ -332,18 +374,25 @@ public class UI_Manager : MonoBehaviour
         cardDescriptionSize.sizeDelta = new Vector2( cardDescription.transform.localScale.x , (float)newHeight ) ;
     }
 
-    void GUIUpdate() {
+    //Network Package Filter
+    void packageFilter() {
         while (animationQueue.Count != 0) {
             Package act = animationQueue.Dequeue();
             switch (act.ACTION){
                 case ACTION.PLAYER_JOIN:
                     players = new List<PlayerStatus>(act.playerStatuses);
-                    TestCase();
-                    playerSlotUpdate();
+                    //TestCase();
+                    //playerSlotUpdate();
+                    HobbyGUIUpdate();
+                    break;
+                case ACTION.GAMESTART:
+                    gameStartAni();
                     break;
                 case ACTION.NEW_TURN:
+                    newTurnAni();
                     break;
                 case ACTION.NEXT_PLAYER:
+                    nextPlayerAni();
                     break;
                 case ACTION.CARD_ACTIVE:
                     switch(act.index/MAXCARD) {
@@ -368,7 +417,7 @@ public class UI_Manager : MonoBehaviour
                 case ACTION.ASSIGN_PLAYER_ID:
                     playerID = act.index;
                     PlayerStatus player = new PlayerStatus();
-                    player.name = string.Format("Test Player {0}",playerID);
+                    player.name = PlayerNameInput.text;
 
                     List<PlayerStatus> sendName = new List<PlayerStatus>();
                     sendName.Add(player);
@@ -385,10 +434,39 @@ public class UI_Manager : MonoBehaviour
             }
         }
     }
-    void actionCardAnimate(int cardID) {
-        cardWarningUI(cardID);
+
+    //Lobby
+    void HobbyGUIUpdate() {
+        for(int i=0;i< players.Count;i++) {
+            hobbyPlayerNameText[i].text = players[i].name;
+            hobbyPlayerNameDisplay[i].SetActive(true);
+        }
+        if (playerID == 0)
+            gameStartButton.SetActive(true);
     }
 
+    void gameStartAni() {
+        GUIInit();
+        FiledUpdate();
+        playerSlotUpdate();
+        hobby.SetActive(false);
+    }
+
+    //NEW_TURN
+    void newTurnAni() {
+        FiledUpdate();
+        playerSlotUpdate();
+    }
+
+    //NEXT_PLAYER
+    void nextPlayerAni() {
+        turn++;
+        if(turn % players.Count == playerID) {
+            nextPlayerButon.SetActive(true);
+        }
+    }
+
+    //CARD_ACTIVE
     void cardWarningUI(int cardID) {
         Card card = searchCard(cardID);
         cardWarnig.CardName.text = card.Name;
@@ -396,33 +474,28 @@ public class UI_Manager : MonoBehaviour
         cardWarnig.CardDescription.text = card.description;
 
         cardWarnig.gameObject.name = cardID.ToString();
-        cardWarnig.gameObject.SetActive(true);
+        cardWarnigControl.Play("CardWarning");
+        //cardWarnig.gameObject.SetActive(true);
     }
 
+    //ACTION_CARD
+    void actionCardAnimate(int cardID) {
+        cardWarningUI(cardID);
+    }
+
+    //FATE_CARD
     void FateCardAni(int cardID) {
         cardWarningUI(cardID);
     }
 
+    //EVENT_CARD
     void eventCardAnimate(int cardID) {
         EventNoti.name = cardID.ToString();
         EventNotiText.text = string.Format("Event:{0}", cardList.eventCardList[cardID % MAXCARD].card.Name);
     }
 
-    Card searchCard(int cardID) {
-        int c = cardID / MAXCARD;
-        switch (c) {
-            case 1:
-                return cardList.actionCardsList[cardID % MAXCARD].card;
-            case 2:
-                return cardList.corpCardsList[cardID % MAXCARD].card;
-            case 3:
-                return cardList.fateCardsList[cardID % MAXCARD].card;
-            case 4:
-                return cardList.eventCardList[cardID % MAXCARD].card;
-        }
-        return null;
-    }
 
+    //GET_NEW_CARD
     void getNewActionCard(int cardID) {
         GameObject newCard = Instantiate(cardTemp, Vector3.zero, Quaternion.identity, handCardSlot.transform);
         UI_Card CardInf = newCard.GetComponent<UI_Card>();
@@ -438,5 +511,23 @@ public class UI_Manager : MonoBehaviour
         CardInf.UserAction[0].GetComponent<Button>().onClick.AddListener(delegate { useCard(cardID); });
         players[playerID].handCard.Add(cardID);
     }
+
+    //tool function
+    Card searchCard(int cardID) {
+        int c = cardID / MAXCARD;
+        switch (c) {
+            case 1:
+                return cardList.actionCardsList[cardID % MAXCARD].card;
+            case 2:
+                return cardList.corpCardsList[cardID % MAXCARD].card;
+            case 3:
+                return cardList.fateCardsList[cardID % MAXCARD].card;
+            case 4:
+                return cardList.eventCardList[cardID % MAXCARD].card;
+        }
+        return null;
+    }
+
+
 
 }

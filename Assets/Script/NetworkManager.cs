@@ -13,7 +13,9 @@ public class NetworkManager : MonoBehaviour
     List<Socket> gateway = new List<Socket>();
     private static byte[] result = new byte[2048];
     public static Queue<Package> sendingQueue = new Queue<Package>();
-
+    public static bool connectSettingComplete = false;
+    public static string ip;
+    public static int port;
     private delegate void DelTalkMessageUpdate(string s);
 
     bool connect = false;
@@ -22,21 +24,33 @@ public class NetworkManager : MonoBehaviour
     void Start()
     {
         Application.runInBackground = true;
-        StartConnect();
+        //StartConnect();
     }
 
     // Update is called once per frame
     void Update() {
-        
+
+        if (connectSettingComplete)
+            StartConnect();
         //listenSocket();
         packageSend();
     }
 
-    void StartConnect() {
-        IPAddress ip = IPAddress.Parse("25.9.176.234");
-        IPEndPoint ipe = new IPEndPoint(ip, 1234);
-        clinetSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+    public void StartConnect() {
+        if (connect)
+            return;
+        connectSettingComplete = false;
+        IPEndPoint ipe;
         try {
+            IPAddress ipAddress = IPAddress.Parse(ip);
+            ipe = new IPEndPoint(ipAddress, port);
+        } catch {
+            return;
+        }
+
+        try {
+
+            clinetSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             clinetSocket.Connect(ipe);
             //clinetSocket.Blocking = false;
             connect = true;
@@ -62,7 +76,7 @@ public class NetworkManager : MonoBehaviour
                 break;
             gateway.Add(clinetSocket);
             Socket.Select(gateway,null,null,100);
-            Debug.Log(gateway.Count);
+            //Debug.Log(gateway.Count);
             try {
                 if (gateway.Count != 0) {
                     //通過clientSocket接收資料
@@ -106,9 +120,9 @@ public class NetworkManager : MonoBehaviour
     }
 
     void listenMessage() {
-        UdpClient udpClient = new UdpClient(1235);
+        UdpClient udpClient = new UdpClient(port + 1);
         try {
-            udpClient.Connect("25.9.176.234", 1235);
+            udpClient.Connect(ip, port+1);
 
             //IPEndPoint object will allow us to read datagrams sent from any source.
             IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
@@ -132,5 +146,10 @@ public class NetworkManager : MonoBehaviour
     }
     public void MessageUpdate(string message) {
         UI_Manager.talkMessage += message;
+    }
+
+    private void OnApplicationQuit() {
+        if(connect)
+            clinetSocket.Close();
     }
 }
