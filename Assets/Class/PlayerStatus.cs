@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -10,12 +11,12 @@ public class PlayerStatus {
     public corpCard[] farm;
     public List<int> handCard;
     public int money;
-    public int[] effect;
+    public int[] effect;// [0] HARVEST_RATIO [1] ¥Í¬¡¶O
 
     public PlayerStatus() {
-        this.farm = new corpCard[4];
+        this.farm = new corpCard[4]; 
         this.handCard = new List<int>();
-        money = 40;
-        effect = new int[1] { 1 };
+        money = 20;
+        effect = new int[Enum.GetNames(typeof(EFFECT_ID)).Length];
     }
 }
